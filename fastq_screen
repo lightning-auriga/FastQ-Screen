@@ -1262,12 +1262,13 @@ sub bisulfite_mapping {
 	unlink $ambiguous_file or die "Could not delete Bismark amibiguous reads outputfile '$ambiguous_file'.\n";
 }
 
-#Uses Bowtie or Bowtie2 to map an input file to a specified genome
+#Uses Bowtie, Bowtie2, or minimap2 to map an input file to a specified genome
 #Results stored in the @index_genomes array
 sub conventional_mapping {
 
     my ( $illumina_flag, $read_length, $library, $file, $error_filename, $index_genomes_ref, $library_index, $error_fh ) = @_;
     my $aligner_command;
+    my $reference_extension;
 
     #Determine whether to execute bowtie1 or bowtie2
     if ( $aligner eq 'bowtie' ) {
@@ -1277,7 +1278,14 @@ sub conventional_mapping {
     } elsif ($aligner eq 'bwa')  {    #BWA
     	$aligner_command = "$path_to_bwa mem -a $bwa_opts $illumina_flag -t $number_of_threads $library->[1] \'$file\' 2>$error_filename |";
     } elsif ($aligner eq 'minimap2')  {    #minimap2
-    	$aligner_command = "$path_to_minimap2 -a $minimap2_opts $illumina_flag -t $number_of_threads $library->[1].fa.gz \'$file\' 2>$error_filename |";
+        if (-e "$library->[1].mmi") {
+            $reference_extension = "mmi";
+        } elsif (-e "$library->[1].fa.gz") {
+            $reference_extension = "fa.gz";
+        } else {
+            $reference_extension = "fa";
+        }
+    	$aligner_command = "$path_to_minimap2 -a $minimap2_opts $illumina_flag -t $number_of_threads $library->[1].$reference_extension \'$file\' 2>$error_filename |";
     } else {
         die "Unknown aligner";
     }
@@ -1417,7 +1425,7 @@ sub load_configuration {
                 if ( -e "$database_path.amb" ) {
                     $bwa_database_exists = 1;
                 }
-                if ( -e "$database_path.fa.gz" ) {
+                if ( -e "$database_path.fa.gz" or -e "$database_path.fa" or -e "$database_path.mmi" ) {
                     $minimap2_database_exists = 1;
                 }
             }
@@ -1542,7 +1550,7 @@ sub load_configuration {
                         next;
                     }
                 } elsif ( $aligner eq 'minimap2' ) {    #minimap2
-                    unless ( -e "$db_path.fa" or -e "$db_path.fa.gz" ) {
+                    unless ( -e "$db_path.fa" or -e "$db_path.fa.gz" or -e "$db_path.mmi" ) {
                         warn "Skipping DATABASE '$db_name' since no minimap2 index was found at '$db_path'\n";
 						$database_skipped_flag = 1;
                         next;
@@ -2606,14 +2614,17 @@ Options
                       be useful to allow reads to be trimmed before
                       alignment etc. 
 
- --minimap2 <text>    Specify extra parameters to be passed to BWA. 
+ --minimap2 <text>    Specify extra parameters to be passed to minimap2. 
                       These parameters should be quoted to clearly 
                       delimit minimap2 parameters from FastQ Screen 
                       parameters. You should not try to use this option 
                       to override the normal search or reporting options 
                       for minimap2 which are set automatically but it might 
                       be useful to allow reads to be trimmed before
-                      alignment etc. 
+                      alignment etc. If you provide a .mmi reference,
+                      these settings need to be compatible with the
+                      minimap2 invocation used to create the .mmi index,
+                      or minimap2 will fail.
 
  --conf <path>        Manually specify a location for the configuration.
  
