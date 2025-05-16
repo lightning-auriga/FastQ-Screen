@@ -116,7 +116,7 @@ if ($version) {
     exit(0);
 }
 
-if ($gzip_cmd == "") {
+if ($gzip_cmd eq "") {
     $gzip_cmd = "gzip";
 }
 

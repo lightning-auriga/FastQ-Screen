@@ -53,7 +53,7 @@ unless (@ARGV) {
     exit(1);
 }
 
-if ($config{gzip} == "") {
+if ($config{gzip} eq "") {
     $config{gzip} = "gzip";
 }
 
