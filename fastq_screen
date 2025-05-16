@@ -61,6 +61,7 @@ my $minimap2_opts;
 my $nohits;
 my $zip_data_output = 0;
 my $aligner;
+my $gzip_cmd;
 my $force;
 my $paired;
 my $bisulfite;
@@ -89,6 +90,7 @@ my $config_result = GetOptions(
     "threads=i"   => \$threads,
     "nohits"      => \$nohits,
     "aligner=s"   => \$aligner,
+    "gzip:s"      => \$gzip_cmd,
     "force"       => \$force,
     "paired"      => \$paired,
     "bisulfite"   => \$bisulfite,
@@ -112,6 +114,10 @@ if ($help) {
 if ($version) {
     print "FastQ Screen v$VERSION\n";
     exit(0);
+}
+
+if ($gzip_cmd == "") {
+    $gzip_cmd = "gzip";
 }
 
 if(defined $add_genome){   #Add a genome to the configuration file
@@ -435,7 +441,7 @@ sub process_file {
 
         #Check if the read file is compressed and open accordingly
         if ( $file =~ /\.gz$/ ) {
-            open( IN_COUNT, "gunzip -c \'$file\' |" ) or do {
+            open( IN_COUNT, "$gzip_cmd -d -c \'$file\' |" ) or do {
                 warn "Can't read $file: $!";
                 return;
             };
@@ -681,14 +687,14 @@ sub process_tag_files{
 		}
 			
 		if($file =~ /\.gz$/){
-			open (IN_PROCESS_TAG, "gunzip -c $file |") or die "Could not read file '$file' : $!";
+			open (IN_PROCESS_TAG, "$gzip_cmd -d -c $file |") or die "Could not read file '$file' : $!";
 			$zip_data_output = 1;    #Output will be zipped
 		 } else{
 		 	open (IN_PROCESS_TAG, '<', $file) or die "Could not read file '$file' : $!";
 		 }
 		
 		if ($zip_data_output) {    #Declared outside of subroutine
-			open( OUT_PROCESS_TAG, "| gzip -c - > $outfile" ) or die "Couldn't write to file '$outfile' : $!";
+			open( OUT_PROCESS_TAG, "| $gzip_cmd -c - > $outfile" ) or die "Couldn't write to file '$outfile' : $!";
 		} else {
 			open( OUT_PROCESS_TAG, ">$outfile" ) or die "Could not write to '$outfile' : $!";
 		}
@@ -1224,7 +1230,7 @@ sub bisulfite_mapping {
 	#Extract the IDs and report as multi-mapping
 	my $ambiguous_file = basename($file);
 	$ambiguous_file = $outdir . "$db_name.$ambiguous_file" . "_ambiguous_reads.fq.gz";
-	open (AMBIGUOUS_FILE, "gunzip -c $ambiguous_file  |") or die "Could not read file '$ambiguous_file ' : $!";
+	open (AMBIGUOUS_FILE, "$gzip_cmd -d -c $ambiguous_file  |") or die "Could not read file '$ambiguous_file ' : $!";
 
 	while (<AMBIGUOUS_FILE>) {
 		my $seqname = $_;
@@ -1642,11 +1648,11 @@ sub subset {
         return;
     };
 
-    #Move back to the start of the file.  The Seek function will not work if reading the file using zcat (now gunzip -c), so
+    #Move back to the start of the file.  The Seek function will not work if reading the file using zcat (now gzip -d -c), so
     #close and open the file to move back to the start.
 
     if ( $file =~ /\.gz$/ ) {
-        open( IN_SUBSET, "gunzip -c \'$file\' |" ) or do {
+        open( IN_SUBSET, "$gzip_cmd -d -c \'$file\' |" ) or do {
             warn "Can't read $file: $!";
             return;
         };
@@ -1704,7 +1710,7 @@ sub get_read_length {
 
     #Check if the read file is compressed and open accordingly
     if ( $file =~ /\.gz$/ ) {
-        open( IN_LENGTH, "gunzip -c \'$file\' |" ) or do {
+        open( IN_LENGTH, "$gzip_cmd -d -c \'$file\' |" ) or do {
             warn "Failed to read $file: $!";
             return 0;
         };
@@ -1904,7 +1910,7 @@ sub find_no_hits {
     open( IN_NOHITS, '<', $file ) or die "Can't read '$file' : $!";
 
     if ($zip_data_output) {    #Declared outside of subroutine
-        open( OUT_NOHITS, "| gzip -c - > $no_hits_filename" ) or die "Couldn't write to file '$no_hits_filename' : $!";
+        open( OUT_NOHITS, "| $gzip_cmd -c - > $no_hits_filename" ) or die "Couldn't write to file '$no_hits_filename' : $!";
     } else {
         open( OUT_NOHITS, ">$no_hits_filename" ) or die "Could not write to '$no_hits_filename' : $!";
     }
@@ -1948,7 +1954,7 @@ sub tag_reads {
     open( IN_TAG, '<', $file ) or die "Can't read '$file' : $!";
 
     if ($zip_data_output) {    #Declared outside of subroutine
-        open( OUT_TAG, "| gzip -c - > $tagged_filename" ) or die "Couldn't write to file '$tagged_filename' : $!";
+        open( OUT_TAG, "| $gzip_cmd -c - > $tagged_filename" ) or die "Couldn't write to file '$tagged_filename' : $!";
     } else {
         open( OUT_TAG, ">$tagged_filename" ) or die "Could not write to '$tagged_filename' : $!";
     }
@@ -2740,6 +2746,12 @@ Options
                       reads in the original FastQ file. This option should 
                       only be used when minimising processing time is of 
                       highest priority. 
+
+--gzip <str>          Executable of compression utility to use for gz file
+                      compression and decompression. Defaults to `gzip`.
+                      The tool must accept -c to stream to stdout
+                      and -d to decompress. Tested alternatives include
+                      pigz and igzip.
 
 --version             Print the program version and exit.
 

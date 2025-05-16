@@ -37,7 +37,8 @@ use Data::Dumper;
 my %config;
 my $config_result = GetOptions(
     "help" => \$config{help},
-    "zip" => \$config{zip}
+    "zip" => \$config{zip},
+    "gzip:s" => \$config{gzip}
 );
 die "Could not parse options" unless ($config_result);
 
@@ -52,6 +53,12 @@ unless (@ARGV) {
     exit(1);
 }
 
+if ($config{gzip} == "") {
+    $config{gzip} = "gzip";
+}
+
+my $gzip_cmd = $config{gzip};
+
 #Pass file names as command-line arguments
 my @files = deduplicate_array(@ARGV);
 
@@ -65,7 +72,7 @@ foreach my $file (@files) {
 	$outfile .= '.gz' if ($config{zip});
 
    if ($config{zip}) {    #Declared outside of subroutine
-        open( OUT, "| gzip -c - > $outfile" ) or die "Couldn't write to file '$outfile' : $!";
+        open( OUT, "| ${gzip_cmd} -c - > $outfile" ) or die "Couldn't write to file '$outfile' : $!";
     } else {
         open( OUT, ">$outfile" ) or die "Could not write to '$outfile' : $!";
     }
@@ -121,7 +128,7 @@ sub cleverOpen{
 	if( $file =~ /\.bam$/){
 		open( $fh, "samtools view -h $file |" ) or die "Couldn't read '$file' : $!";  
 	}elsif ($file =~ /\.gz$/){
-		open ($fh,"zcat $file |") or die "Couldn't read $file : $!";
+		open ($fh,"$gzip_cmd -d -c $file |") or die "Couldn't read $file : $!";
 	} else {
 		open ($fh, $file) or die "Could not read $file: $!";
     }
@@ -166,3 +173,8 @@ COMMAND LINE OPTIONS
 
 --help           Print program help and exit
 --zip            Gzip output
+--gzip <str>     Executable of compression utility to use for gz file
+                 compression and decompression. Defaults to `gzip`.
+                 The tool must accept -c to stream to stdout
+                 and -d to decompress. Tested alternatives include
+                 pigz and igzip.
