@@ -72,7 +72,7 @@ foreach my $file (@files) {
 	$outfile .= '.gz' if ($config{zip});
 
    if ($config{zip}) {    #Declared outside of subroutine
-        open( OUT, "| ${gzip_cmd} -c - > $outfile" ) or die "Couldn't write to file '$outfile' : $!";
+        open( OUT, "| $gzip_cmd -c - > $outfile" ) or die "Couldn't write to file '$outfile' : $!";
     } else {
         open( OUT, ">$outfile" ) or die "Could not write to '$outfile' : $!";
     }
